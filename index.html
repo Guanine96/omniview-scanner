@@ -195,11 +195,17 @@
     }
 
     function prikaziKolicinuModal(item){
+      console.log('[Scanner] prikaziKolicinuModal called with item:',item);
       currentItem=item;
       var modal=document.getElementById('quantity-modal');
       var nazivEl=document.getElementById('item-naziv');
       var barkodEl=document.getElementById('item-barkod');
       var input=document.getElementById('kolicina-input');
+      
+      console.log('[Scanner] Modal element:',modal);
+      console.log('[Scanner] Naziv element:',nazivEl);
+      console.log('[Scanner] Barkod element:',barkodEl);
+      console.log('[Scanner] Input element:',input);
       
       if(nazivEl)nazivEl.textContent=item.naziv;
       if(barkodEl)barkodEl.textContent='Barkod: '+item.barKod;
@@ -209,7 +215,12 @@
         input.select();
       }
       
-      if(modal)modal.style.display='block';
+      if(modal){
+        modal.style.display='block';
+        console.log('[Scanner] Modal displayed');
+      }else{
+        console.log('[Scanner] Modal element not found!');
+      }
       updateStatus('Unesite količinu','waiting');
     }
 
