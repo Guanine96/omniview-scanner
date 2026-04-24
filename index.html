@@ -223,6 +223,20 @@
       setTimeout(startScanner,500);
     };
 
+    // Listen for feedback from parent window
+    window.addEventListener('message',function(event){
+      if(event.data&&event.data.type==='evidentirano'){
+        console.log('[Scanner] Received feedback:',event.data);
+        var naziv=event.data.naziv||'Artikal';
+        var kolicina=event.data.kolicina||1;
+        updateStatus('✅ Evidentirano: '+naziv+' ('+kolicina+' kom)','active');
+        // Clear status after 3 seconds
+        setTimeout(function(){
+          updateStatus('Aktivan - Skenirajte barkod','active');
+        },3000);
+      }
+    });
+
     // Clean up on close
     window.onbeforeunload=function(){
       console.log('[Scanner] Window closing, stopping scanner');
