@@ -48,6 +48,19 @@
       <button class="btn btn-secondary" onclick="stopScanner()">Zaustavi</button>
       <button class="btn btn-secondary" onclick="toggleFlashlight()">🔦 Blic</button>
     </div>
+    
+    <div id="quantity-modal" style="display:none;margin-top:16px;padding:16px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:8px;">
+      <div style="color:#fff;font-weight:700;margin-bottom:8px;" id="item-naziv">—</div>
+      <div style="color:#999;font-size:12px;margin-bottom:12px;" id="item-barkod">—</div>
+      <div style="margin-bottom:12px;">
+        <label style="color:#fff;font-size:12px;margin-bottom:4px;display:block;">Količina:</label>
+        <input type="number" id="kolicina-input" value="1" min="1" style="width:100%;padding:8px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#fff;font-size:14px;">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="pošaljiEvidentiraj()" style="flex:1;">Evidentiraj</button>
+        <button class="btn btn-secondary" onclick="otkaziKolicinu()" style="flex:1;">Otkaži</button>
+      </div>
+    </div>
   </div>
 
     <script>
@@ -55,6 +68,7 @@
     var html5QrcodeScanner=null;
     var videoTrack=null;
     var audioBeep=new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
+    var currentItem=null;
 
     function updateStatus(text,className){
       var el=document.getElementById('status');
@@ -180,6 +194,58 @@
       }
     }
 
+    function prikaziKolicinuModal(item){
+      currentItem=item;
+      var modal=document.getElementById('quantity-modal');
+      var nazivEl=document.getElementById('item-naziv');
+      var barkodEl=document.getElementById('item-barkod');
+      var input=document.getElementById('kolicina-input');
+      
+      if(nazivEl)nazivEl.textContent=item.naziv;
+      if(barkodEl)barkodEl.textContent='Barkod: '+item.barKod;
+      if(input){
+        input.value=1;
+        input.focus();
+        input.select();
+      }
+      
+      if(modal)modal.style.display='block';
+      updateStatus('Unesite količinu','waiting');
+    }
+
+    function otkaziKolicinu(){
+      var modal=document.getElementById('quantity-modal');
+      if(modal)modal.style.display='none';
+      currentItem=null;
+      updateStatus('Aktivan - Skenirajte barkod','active');
+    }
+
+    function pošaljiEvidentiraj(){
+      if(!currentItem){
+        console.log('[Scanner] No current item');
+        return;
+      }
+      
+      var input=document.getElementById('kolicina-input');
+      var kolicina=parseInt(input.value,10)||1;
+      
+      if(window.opener){
+        console.log('[Scanner] Sending evidentiraj request:',currentItem.sifra,kolicina,currentItem.naziv);
+        window.opener.postMessage({
+          type:'evidentiraj',
+          sifra:currentItem.sifra,
+          kolicina:kolicina,
+          naziv:currentItem.naziv
+        },'*');
+      }
+      
+      // Hide modal
+      var modal=document.getElementById('quantity-modal');
+      if(modal)modal.style.display='none';
+      currentItem=null;
+      updateStatus('⏳ Evidentiranje...','waiting');
+    }
+
     function onScanFailure(error){
       // Silent failure
     }
@@ -225,15 +291,28 @@
 
     // Listen for feedback from parent window
     window.addEventListener('message',function(event){
+      if(event.data&&event.data.type==='itemFound'){
+        console.log('[Scanner] Received itemFound:',event.data);
+        prikaziKolicinuModal(event.data);
+      }
+      
+      if(event.data&&event.data.type==='itemNotFound'){
+        console.log('[Scanner] Received itemNotFound:',event.data);
+        updateStatus('❌ Barkod nije pronađen','error');
+        setTimeout(function(){
+          updateStatus('Aktivan - Skenirajte barkod','active');
+        },2000);
+      }
+      
       if(event.data&&event.data.type==='evidentirano'){
-        console.log('[Scanner] Received feedback:',event.data);
+        console.log('[Scanner] Received evidentirano feedback:',event.data);
         var naziv=event.data.naziv||'Artikal';
         var kolicina=event.data.kolicina||1;
         updateStatus('✅ Evidentirano: '+naziv+' ('+kolicina+' kom)','active');
-        // Clear status after 3 seconds
+        // Clear status after 2 seconds
         setTimeout(function(){
           updateStatus('Aktivan - Skenirajte barkod','active');
-        },3000);
+        },2000);
       }
     });
 
