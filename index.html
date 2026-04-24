@@ -307,6 +307,11 @@
 
     // Listen for feedback from parent window
     window.addEventListener('message',function(event){
+      if(event.data&&event.data.type==='itemInPopis'){
+        console.log('[Scanner] Received itemInPopis:',event.data);
+        prikaziKolicinuModal(event.data);
+      }
+      
       if(event.data&&event.data.type==='itemFound'){
         console.log('[Scanner] Received itemFound:',event.data);
         prikaziKolicinuModal(event.data);
