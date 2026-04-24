@@ -304,11 +304,11 @@
         },2000);
       }
       
-      if(event.data&&event.data.type==='evidentirano'){
-        console.log('[Scanner] Received evidentirano feedback:',event.data);
+      if(event.data&&event.data.type==='kolicinaUpisana'){
+        console.log('[Scanner] Received kolicinaUpisana feedback:',event.data);
         var naziv=event.data.naziv||'Artikal';
         var kolicina=event.data.kolicina||1;
-        updateStatus('✅ Evidentirano: '+naziv+' ('+kolicina+' kom)','active');
+        updateStatus('✅ Količina upisana: '+naziv+' ('+kolicina+' kom)','active');
         // Clear status after 2 seconds
         setTimeout(function(){
           updateStatus('Aktivan - Skenirajte barkod','active');
