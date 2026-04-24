@@ -207,7 +207,12 @@
       console.log('[Scanner] Barkod element:',barkodEl);
       console.log('[Scanner] Input element:',input);
       
-      if(nazivEl)nazivEl.textContent=item.naziv;
+      if(nazivEl){
+        nazivEl.textContent=item.naziv;
+        if(!item.inPopis){
+          nazivEl.textContent+=' ⚠️ (nije u popisu)';
+        }
+      }
       if(barkodEl)barkodEl.textContent='Barkod: '+item.barKod;
       if(input){
         input.value=1;
@@ -221,7 +226,7 @@
       }else{
         console.log('[Scanner] Modal element not found!');
       }
-      updateStatus('Unesite količinu','waiting');
+      updateStatus(item.inPopis?'Unesite količinu':'⚠️ Nije u popisu - ipak možete uneti količinu','waiting');
     }
 
     function otkaziKolicinu(){
