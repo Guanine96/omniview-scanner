@@ -132,49 +132,6 @@
             ).then(function(){
               updateStatus('Aktivan - Skenirajte barkod','active');
               console.log('[Scanner] Scanner started successfully');
-              
-              // Apply Full HD resolution and macro focus mode
-              try{
-                var videoElement=document.querySelector('#reader video');
-                if(videoElement&&videoElement.srcObject){
-                  var tracks=videoElement.srcObject.getVideoTracks();
-                  if(tracks.length>0){
-                    var track=tracks[0];
-                    var capabilities=track.getCapabilities();
-                    
-                    // Apply Full HD resolution
-                    if(capabilities.width&&capabilities.height){
-                      track.applyConstraints({
-                        advanced:[
-                          {width:{ideal:1920},height:{ideal:1080}}
-                        ]
-                      }).catch(function(e){
-                        console.log('Resolution set failed',e);
-                      });
-                    }
-                    
-                    // Apply macro/continuous focus
-                    if(capabilities.focusMode){
-                      var focusConstraints=[];
-                      if(capabilities.focusMode.includes('macro')){
-                        focusConstraints.push({focusMode:'macro'});
-                      }
-                      if(capabilities.focusMode.includes('continuous')){
-                        focusConstraints.push({focusMode:'continuous'});
-                      }
-                      if(focusConstraints.length>0){
-                        track.applyConstraints({
-                          advanced:focusConstraints
-                        }).catch(function(e){
-                          console.log('Focus mode set failed',e);
-                        });
-                      }
-                    }
-                  }
-                }
-              }catch(e){
-                console.log('Camera optimization error',e);
-              }
             }).catch(function(err){
               console.error('[Scanner] Start error:',err);
               updateStatus('Greška kamere: '+err,'error');
