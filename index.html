@@ -122,7 +122,11 @@
               supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             };
 
-            var cameraConfig={facingMode:"environment"};
+            var cameraId=devices.find(function(d){
+              var label=d.label.toLowerCase();
+              return (label.includes('back')||label.includes('environment'))&&!label.includes('wide')&&!label.includes('ultra');
+            });
+            var cameraConfig=cameraId?{deviceId:{exact:cameraId.id}}:{facingMode:"environment"};
             console.log('[Scanner] Using camera config:',cameraConfig);
 
             html5QrcodeScanner.start(
@@ -133,36 +137,6 @@
             ).then(function(){
               updateStatus('Aktivan - Skenirajte barkod','active');
               console.log('[Scanner] Scanner started successfully');
-              
-              // Apply Full HD resolution and continuous focus
-              try{
-                var track=html5QrcodeScanner.getRunningTrack();
-                if(track){
-                  var capabilities=track.getCapabilities();
-                  var constraints={advanced:[]};
-                  
-                  // Full HD resolution
-                  if(capabilities.width&&capabilities.height){
-                    constraints.advanced.push({
-                      width:{ideal:1920},
-                      height:{ideal:1080}
-                    });
-                  }
-                  
-                  // Continuous focus
-                  if(capabilities.focusMode&&capabilities.focusMode.includes('continuous')){
-                    constraints.advanced.push({focusMode:'continuous'});
-                  }
-                  
-                  if(constraints.advanced.length>0){
-                    track.applyConstraints(constraints).catch(function(e){
-                      console.log('Camera constraints failed',e);
-                    });
-                  }
-                }
-              }catch(e){
-                console.log('Camera optimization error',e);
-              }
             }).catch(function(err){
               console.error('[Scanner] Start error:',err);
               updateStatus('Greška kamere: '+err,'error');
