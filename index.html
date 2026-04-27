@@ -118,6 +118,7 @@
               fps:10,
               qrbox:{width:250,height:150},
               aspectRatio:1.0,
+              experimentalFeatures:{useBarCodeDetectorIfSupported:true},
               supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             };
 
@@ -132,6 +133,41 @@
             ).then(function(){
               updateStatus('Aktivan - Skenirajte barkod','active');
               console.log('[Scanner] Scanner started successfully');
+              
+              // Apply Full HD resolution, focus and zoom
+              try{
+                var track=html5QrcodeScanner.getRunningTrack();
+                if(track){
+                  var capabilities=track.getCapabilities();
+                  var constraints={advanced:[]};
+                  
+                  // Full HD resolution
+                  if(capabilities.width&&capabilities.height){
+                    constraints.advanced.push({
+                      width:{min:640,ideal:1920,max:1920},
+                      height:{min:480,ideal:1080,max:1080}
+                    });
+                  }
+                  
+                  // Continuous focus
+                  if(capabilities.focusMode&&capabilities.focusMode.includes('continuous')){
+                    constraints.advanced.push({focusMode:'continuous'});
+                  }
+                  
+                  // Digital zoom (2x to reduce celofan glare)
+                  if(capabilities.zoom){
+                    constraints.advanced.push({zoom:2.0});
+                  }
+                  
+                  if(constraints.advanced.length>0){
+                    track.applyConstraints(constraints).catch(function(e){
+                      console.log('Camera constraints failed',e);
+                    });
+                  }
+                }
+              }catch(e){
+                console.log('Camera optimization error',e);
+              }
             }).catch(function(err){
               console.error('[Scanner] Start error:',err);
               updateStatus('Greška kamere: '+err,'error');
