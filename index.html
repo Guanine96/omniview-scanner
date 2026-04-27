@@ -149,7 +149,7 @@
         })
         .catch(function(err){
           console.error('[Scanner] Get cameras error:',err);
-          updateStatus('Greška pri listanju kamera','error');
+          updateStatus('Greška pri listanju kamera: '+err,'error');
         });
     }
 
