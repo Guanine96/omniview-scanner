@@ -122,11 +122,7 @@
               supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             };
 
-            var cameraId=devices.find(function(d){
-              var label=d.label.toLowerCase();
-              return (label.includes('back')||label.includes('environment'))&&!label.includes('wide')&&!label.includes('ultra');
-            });
-            var cameraConfig=cameraId?{deviceId:{exact:cameraId.id}}:{facingMode:"environment"};
+            var cameraConfig={facingMode:"environment"};
             console.log('[Scanner] Using camera config:',cameraConfig);
 
             html5QrcodeScanner.start(
