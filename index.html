@@ -12,7 +12,7 @@
     .header h1{font-size:20px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#fff;}
     .scanner-container{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;}
     #reader{width:100%;max-width:400px;min-height:300px;border-radius:12px;overflow:hidden;background:#1a1a1a;border:2px solid #2a2a2a;}
-    #reader video{object-fit:cover;border-radius:12px;}
+    #reader video{object-fit:cover;border-radius:12px;filter:grayscale(1) contrast(2.0) brightness(0.7) saturate(0);}
     .controls{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;justify-content:center;}
     .btn{padding:12px 24px;background:#be161b;border:none;border-radius:8px;color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:transform 0.15s ease;}
     .btn:hover{transform:scale(1.05);}
@@ -26,6 +26,13 @@
     .last-scan.show{display:block;}
     .last-scan .barcode{font-size:24px;font-weight:900;color:#4ade80;font-family:'Courier New',monospace;}
     .last-scan .label{font-size:12px;color:#999;margin-top:4px;}
+    .scan-zone-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;height:300px;border:3px solid rgba(74,222,128,0.5);border-radius:8px;pointer-events:none;z-index:10;}
+    .scan-zone-indicator::before,.scan-zone-indicator::after{content:'';position:absolute;background:rgba(74,222,128,0.8);}
+    .scan-zone-indicator::before{top:-3px;left:-3px;width:20px;height:3px;}
+    .scan-zone-indicator::after{top:-3px;left:-3px;width:3px;height:20px;}
+    .scan-zone-indicator .corner-br{position:absolute;bottom:-3px;right:-3px;width:20px;height:3px;background:rgba(74,222,128,0.8);}
+    .scan-zone-indicator .corner-bl{position:absolute;bottom:-3px;left:-3px;width:3px;height:20px;background:rgba(74,222,128,0.8);}
+    .scan-zone-indicator .corner-tr{position:absolute;top:-3px;right:-3px;width:3px;height:20px;background:rgba(74,222,128,0.8);}
   </style>
 </head>
 <body>
@@ -34,7 +41,13 @@
   </div>
   
   <div class="scanner-container">
-    <div id="reader"></div>
+    <div id="reader">
+      <div class="scan-zone-indicator">
+        <div class="corner-br"></div>
+        <div class="corner-bl"></div>
+        <div class="corner-tr"></div>
+      </div>
+    </div>
     
     <div class="status" id="status">Status: Čekanje...</div>
     
@@ -69,6 +82,7 @@
     var videoTrack=null;
     var audioBeep=new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
     var currentItem=null;
+    var consecutiveFailures=0;
 
     function updateStatus(text,className){
       var el=document.getElementById('status');
@@ -114,9 +128,11 @@
           try{
             html5QrcodeScanner=new Html5Qrcode("reader");
             var config={
-              fps:10,
-              qrbox:{width:250,height:250},
+              fps:30,
+              qrbox:{width:300,height:300},
               aspectRatio:1.0,
+              disableFlip:false,
+              experimentalFeatures:{useBarCodeDetectorIfSupported:true},
               supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             };
 
@@ -132,6 +148,42 @@
             ).then(function(){
               updateStatus('Aktivan - Skenirajte barkod','active');
               console.log('[Scanner] Scanner started successfully');
+              
+              // Hardware exposure and focus optimization
+              try{
+                var track=html5QrcodeScanner.getRunningTrack();
+                if(track){
+                  var capabilities=track.getCapabilities();
+                  
+                  // Dynamic exposure adjustment
+                  if(capabilities.exposureMode&&capabilities.exposureMode.includes('manual')){
+                    track.applyConstraints({
+                      advanced:[{exposureCompensation:-1.5}]
+                    }).catch(function(e){
+                      console.log('Exposure adjustment failed',e);
+                    });
+                  }
+                  
+                  // Continuous focus mode
+                  if(capabilities.focusMode){
+                    if(capabilities.focusMode.includes('continuous')){
+                      track.applyConstraints({
+                        advanced:[{focusMode:'continuous'}]
+                      }).catch(function(e){
+                        console.log('Focus adjustment failed',e);
+                      });
+                    }else if(capabilities.focusMode.includes('manual')){
+                      track.applyConstraints({
+                        advanced:[{focusMode:'manual',focusDistance:0.5}]
+                      }).catch(function(e){
+                        console.log('Manual focus adjustment failed',e);
+                      });
+                    }
+                  }
+                }
+              }catch(e){
+                console.log('Hardware optimization error',e);
+              }
             }).catch(function(err){
               console.error('[Scanner] Start error:',err);
               updateStatus('Greška kamere: '+err,'error');
@@ -176,6 +228,7 @@
 
     function onScanSuccess(decodedText,decodedResult){
       console.log('[Scanner] Scan success:',decodedText);
+      consecutiveFailures=0;
       // Play beep
       try{audioBeep.play().catch(function(){});}catch(e){}
 
@@ -263,7 +316,11 @@
     }
 
     function onScanFailure(error){
-      // Silent failure
+      consecutiveFailures++;
+      if(consecutiveFailures>=10){
+        updateStatus('Status: Nakrivite paket (odsjaj celofana)','waiting');
+        consecutiveFailures=0;
+      }
     }
 
     function toggleFlashlight(){
