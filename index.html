@@ -49,8 +49,6 @@
     
     <div class="controls">
       <button class="btn" onclick="capturePhoto()">📷 Slikaj barkod</button>
-      <button class="btn btn-secondary" onclick="startScanner()">🎥 Live skeniranje</button>
-      <button class="btn btn-secondary" onclick="stopScanner()">Zaustavi</button>
     </div>
     
     <div id="quantity-modal" style="display:none;margin-top:16px;padding:16px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:8px;">
@@ -166,123 +164,8 @@
       }
     });
 
-    function startScanner(){
-      console.log('[Scanner] startScanner called');
-      isLiveMode=true;
-      
-      if(html5QrcodeScanner){
-        updateStatus('Skener je već aktivan','active');
-        return;
-      }
 
-      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-        updateStatus('Browser ne podržava kameru','error');
-        console.error('[Scanner] Browser does not support mediaDevices');
-        return;
-      }
 
-      updateStatus('Provera kamera...','waiting');
-
-      Html5Qrcode.getCameras()
-        .then(function(devices){
-          console.log('[Scanner] Cameras found:',devices);
-          if(!devices||!devices.length){
-            updateStatus('Nema pronađenih kamera','error');
-            return;
-          }
-
-          try{
-            html5QrcodeScanner=new Html5Qrcode("reader");
-            var config={
-              fps:10,
-              qrbox:{width:250,height:150},
-              aspectRatio:1.0,
-              supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-            };
-
-            var cameraConfig={facingMode:"environment"};
-            console.log('[Scanner] Using camera config:',cameraConfig);
-
-            html5QrcodeScanner.start(
-              cameraConfig,
-              config,
-              onScanSuccess,
-              onScanFailure
-            ).then(function(){
-              updateStatus('Aktivan - Skenirajte barkod','active');
-              console.log('[Scanner] Scanner started successfully');
-            }).catch(function(err){
-              console.error('[Scanner] Start error:',err);
-              updateStatus('Greška kamere: '+err,'error');
-              try{html5QrcodeScanner.clear();}catch(e){}
-              html5QrcodeScanner=null;
-            });
-          }catch(e){
-            console.error('[Scanner] Init error:',e);
-            updateStatus('Greška: '+e,'error');
-            try{html5QrcodeScanner.clear();}catch(err){}
-            html5QrcodeScanner=null;
-          }
-        })
-        .catch(function(err){
-          console.error('[Scanner] Get cameras error:',err);
-          updateStatus('Greška pri listanju kamera: '+err,'error');
-        });
-    }
-
-    function stopScanner(){
-      console.log('[Scanner] stopScanner called');
-      isLiveMode=false;
-      
-      if(html5QrcodeScanner){
-        html5QrcodeScanner.stop().then(function(){
-          html5QrcodeScanner.clear();
-          html5QrcodeScanner=null;
-          if(videoTrack){
-            videoTrack.stop();
-            videoTrack=null;
-          }
-          updateStatus('Zaustavljeno','');
-        }).catch(function(err){
-          try{html5QrcodeScanner.clear();}catch(e){}
-          html5QrcodeScanner=null;
-          if(videoTrack){
-            videoTrack.stop();
-            videoTrack=null;
-          }
-          updateStatus('Zaustavljeno','');
-        });
-      }
-    }
-
-    function onScanSuccess(decodedText,decodedResult){
-      console.log('[Scanner] Scan success:',decodedText);
-      consecutiveFailures=0;
-      // Play beep
-      try{audioBeep.play().catch(function(){});}catch(e){}
-
-      // Show last scan
-      showLastScan(decodedText);
-
-      // Send to parent window
-      if(window.opener){
-        console.log('[Scanner] Sending to parent window');
-        window.opener.postMessage({
-          type:'barcode',
-          data:decodedText
-        },'*');
-      }else{
-        console.log('[Scanner] No parent window, barcode:',decodedText);
-      }
-    }
-
-    function onScanFailure(error){
-      consecutiveFailures++;
-      if(consecutiveFailures>=10){
-        updateStatus('Status: Nakrivite paket (odsjaj celofana)','waiting');
-        consecutiveFailures=0;
-      }
-    }
 
     function prikaziKolicinuModal(item){
       console.log('[Scanner] prikaziKolicinuModal called with item:',item);
@@ -323,7 +206,11 @@
       var modal=document.getElementById('quantity-modal');
       if(modal)modal.style.display='none';
       currentItem=null;
-      updateStatus('Aktivan - Skenirajte barkod','active');
+      updateStatus('Spremno - Kliknite "Slikaj barkod"','active');
+      // Reset modal content for next use
+      setTimeout(function(){
+        modal.innerHTML='<div style="color:#fff;font-weight:700;margin-bottom:8px;" id="item-naziv">—</div><div style="color:#999;font-size:12px;margin-bottom:12px;" id="item-barkod">—</div><div style="margin-bottom:12px;"><label style="color:#fff;font-size:12px;margin-bottom:4px;display:block;">Količina:</label><input type="number" id="kolicina-input" value="1" min="1" style="width:100%;padding:8px;background:#2a2a2a;border:1px solid #3a3a3a;border-radius:4px;color:#fff;font-size:14px;"></div><div style="display:flex;gap:8px;"><button class="btn" onclick="pošaljiEvidentiraj()" style="flex:1;">Evidentiraj</button><button class="btn btn-secondary" onclick="otkaziKolicinu()" style="flex:1;">Otkaži</button></div>';
+      },100);
     }
 
     function pošaljiEvidentiraj(){
@@ -345,51 +232,20 @@
         },'*');
       }
       
-      // Hide modal
+      // Show success message in modal
       var modal=document.getElementById('quantity-modal');
-      if(modal)modal.style.display='none';
-      currentItem=null;
-      updateStatus('⏳ Evidentiranje...','waiting');
+      if(modal){
+        modal.innerHTML='<div style="color:#4ade80;font-weight:700;font-size:16px;text-align:center;padding:20px;">✅ Evidentirano!<br><br><span style="color:#e8e8e8;font-size:14px;">Možete nastaviti sa slikanjem barkodova</span></div>';
+      }
+      updateStatus('✅ Evidentirano - Nastavite sa slikanjem','active');
     }
 
 
-    function toggleFlashlight(){
-      console.log('[Scanner] toggleFlashlight called');
-      if(!html5QrcodeScanner){
-        updateStatus('Prvo pokrenite kameru','error');
-        return;
-      }
 
-      // Try to get video track and toggle torch
-      var videoElement=document.querySelector('#reader video');
-      if(videoElement&&videoElement.srcObject){
-        var tracks=videoElement.srcObject.getVideoTracks();
-        if(tracks.length>0){
-          var track=tracks[0];
-          var capabilities=track.getCapabilities();
-          if(capabilities.torch){
-            var currentSettings=track.getSettings();
-            var newState=!currentSettings.torch;
-            track.applyConstraints({
-              advanced:[{torch:newState}]
-            }).then(function(){
-              updateStatus(newState?'Blic uključen':'Blic isključen','active');
-            }).catch(function(err){
-              updateStatus('Blic nije podržan','error');
-            });
-          }else{
-            updateStatus('Blic nije podržan na ovom uređaju','error');
-          }
-        }
-      }else{
-        updateStatus('Video stream nije dostupan','error');
-      }
-    }
-
-    // Auto-start on load
+    // Auto-start on load - show ready status
     window.onload=function(){
-      console.log('[Scanner] Window loaded, starting scanner in 500ms');
-      setTimeout(startScanner,500);
+      console.log('[Scanner] Window loaded');
+      updateStatus('Spremno - Kliknite "Slikaj barkod"','active');
     };
 
     // Listen for feedback from parent window
@@ -411,11 +267,7 @@
         console.log('[Scanner] Received evidentirano feedback:',event.data);
         var naziv=event.data.naziv||'Artikal';
         var kolicina=event.data.kolicina||1;
-        updateStatus('✅ Evidentirano: '+naziv+' ('+kolicina+' kom)','active');
-        // Clear status after 2 seconds
-        setTimeout(function(){
-          updateStatus('Aktivan - Skenirajte barkod','active');
-        },2000);
+        updateStatus('✅ Evidentirano: '+naziv+' ('+kolicina+' kom) - Nastavite sa slikanjem','active');
       }
     });
 
