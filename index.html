@@ -154,9 +154,12 @@
         reader.readAsDataURL(file);
         
         // Scan the image using html5-qrcode library
+        console.log('[Scanner] Starting scan with file:',file.name,'size:',file.size,'type:',file.type);
         var html5QrCode=new Html5Qrcode("reader");
-        html5QrCode.scanFile(file,true)
+        var config = { formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] };
+        html5QrCode.scanFile(file, true, config)
           .then(function(decodedText){
+            console.log('[Scanner] scanFile resolved with:',decodedText);
             handleScanSuccess(decodedText,previewContainer,preview);
           })
           .catch(function(err){
