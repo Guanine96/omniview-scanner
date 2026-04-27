@@ -67,12 +67,8 @@
 
     <script>
     console.log('[Scanner] Script loaded');
-    var html5QrcodeScanner=null;
-    var videoTrack=null;
     var audioBeep=new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
     var currentItem=null;
-    var consecutiveFailures=0;
-    var isLiveMode=false;
 
     function updateStatus(text,className){
       var el=document.getElementById('status');
@@ -92,6 +88,46 @@
       }
     }
 
+    function handleScanSuccess(decodedText,previewContainer,preview){
+      console.log('[Scanner] Scan success:',decodedText);
+      
+      // Play beep
+      try{audioBeep.play().catch(function(){});}catch(e){}
+      
+      // Show last scan
+      showLastScan(decodedText);
+      
+      // Send to parent window
+      if(window.opener){
+        console.log('[Scanner] Sending to parent window');
+        window.opener.postMessage({
+          type:'barcode',
+          data:decodedText
+        },'*');
+      }else{
+        console.log('[Scanner] No parent window, barcode:',decodedText);
+      }
+      
+      updateStatus('✅ Barkod očitan!','active');
+      
+      // Clear preview after 2 seconds
+      setTimeout(function(){
+        previewContainer.style.display='none';
+        preview.src='';
+        document.getElementById('camera-input').value='';
+      },2000);
+    }
+
+    function handleScanError(err,previewContainer,preview){
+      console.error('[Scanner] Scan error:',err);
+      updateStatus('❌ Barkod nije pronađen na slici','error');
+      setTimeout(function(){
+        previewContainer.style.display='none';
+        preview.src='';
+        document.getElementById('camera-input').value='';
+      },2000);
+    }
+
     function capturePhoto(){
       console.log('[Scanner] capturePhoto called');
       var input=document.getElementById('camera-input');
@@ -104,62 +140,28 @@
         console.log('[Scanner] Photo captured:',file.name);
         updateStatus('Obrada slike...','waiting');
         
+        // Get preview elements for use in scan callbacks
+        var preview=document.getElementById('preview-image');
+        var previewContainer=document.getElementById('preview-container');
+        
         // Show preview
         var reader=new FileReader();
         reader.onload=function(event){
           var imgData=event.target.result;
-          var preview=document.getElementById('preview-image');
-          var previewContainer=document.getElementById('preview-container');
           preview.src=imgData;
           previewContainer.style.display='block';
         };
         reader.readAsDataURL(file);
         
-        // Scan the image using File object directly
-        if(!html5QrcodeScanner){
-          html5QrcodeScanner=new Html5Qrcode("reader");
-        }
-        
-        html5QrcodeScanner.scanFileV2(file,{returnDetailedScanResult:false})
-          .then(function(decodedResult){
-            var decodedText=decodedResult.decodedText;
-            console.log('[Scanner] Scan success:',decodedText);
-            consecutiveFailures=0;
-            
-            // Play beep
-            try{audioBeep.play().catch(function(){});}catch(e){}
-            
-            // Show last scan
-            showLastScan(decodedText);
-            
-            // Send to parent window
-            if(window.opener){
-              console.log('[Scanner] Sending to parent window');
-              window.opener.postMessage({
-                type:'barcode',
-                data:decodedText
-              },'*');
-            }else{
-              console.log('[Scanner] No parent window, barcode:',decodedText);
-            }
-            
-            updateStatus('✅ Barkod očitan!','active');
-            
-            // Clear preview after 2 seconds
-            setTimeout(function(){
-              previewContainer.style.display='none';
-              preview.src='';
-              document.getElementById('camera-input').value='';
-            },2000);
+        // Scan the image using html5-qrcode library
+        var html5QrCode=new Html5Qrcode("reader");
+        html5QrCode.scanFile(file,true)
+          .then(function(decodedText){
+            handleScanSuccess(decodedText,previewContainer,preview);
           })
           .catch(function(err){
             console.error('[Scanner] Scan error:',err);
-            updateStatus('❌ Barkod nije pronađen na slici','error');
-            setTimeout(function(){
-              previewContainer.style.display='none';
-              preview.src='';
-              document.getElementById('camera-input').value='';
-            },2000);
+            handleScanError(err,previewContainer,preview);
           });
       }
     });
