@@ -121,8 +121,7 @@
               supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             };
 
-            var cameraId=devices.find(function(d){return d.label.toLowerCase().includes('back')||d.label.toLowerCase().includes('environment');});
-            var cameraConfig=cameraId?{deviceId:{exact:cameraId.id}}:{facingMode:"environment"};
+            var cameraConfig={facingMode:"environment"};
             console.log('[Scanner] Using camera config:',cameraConfig);
 
             html5QrcodeScanner.start(
@@ -134,6 +133,28 @@
               updateStatus('Aktivan - Skenirajte barkod','active');
               console.log('[Scanner] Scanner started successfully');
               
+              // Preserve focus settings to avoid interfering with macro mode
+              try{
+                var videoElement=document.querySelector('#reader video');
+                if(videoElement&&videoElement.srcObject){
+                  var tracks=videoElement.srcObject.getVideoTracks();
+                  if(tracks.length>0){
+                    var track=tracks[0];
+                    var capabilities=track.getCapabilities();
+                    if(capabilities.focusMode){
+                      if(capabilities.focusMode.includes('continuous')){
+                        track.applyConstraints({
+                          advanced:[{focusMode:'continuous'}]
+                        }).catch(function(e){
+                          console.log('Focus mode set failed',e);
+                        });
+                      }
+                    }
+                  }
+                }
+              }catch(e){
+                console.log('Focus preservation error',e);
+              }
             }).catch(function(err){
               console.error('[Scanner] Start error:',err);
               updateStatus('Greška kamere: '+err,'error');
