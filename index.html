@@ -116,11 +116,7 @@
         reader.readAsDataURL(file);
         
         // Scan the image using File object directly
-        if(!html5QrcodeScanner){
-          html5QrcodeScanner=new Html5Qrcode("reader");
-        }
-        
-        html5QrcodeScanner.scanFile(file,true)
+        Html5Qrcode.scanFile(file,true)
           .then(function(decodedText,decodedResult){
             console.log('[Scanner] Scan success:',decodedText);
             consecutiveFailures=0;
