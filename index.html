@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Barcode Scanner</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/barcode_scanner" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils" type="text/javascript"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d0d0d;color:#e8e8e8;min-height:100vh;display:flex;flex-direction:column;}
@@ -67,14 +65,11 @@
 
     <script>
     console.log('[Scanner] Script loaded');
-    var barcodeScanner=null;
-    var camera=null;
+    var html5QrcodeScanner=null;
     var videoTrack=null;
     var audioBeep=new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
     var currentItem=null;
     var consecutiveFailures=0;
-    var lastBarcode=null;
-    var lastScanTime=0;
 
     function updateStatus(text,className){
       var el=document.getElementById('status');
@@ -96,7 +91,7 @@
 
     function startScanner(){
       console.log('[Scanner] startScanner called');
-      if(barcodeScanner){
+      if(html5QrcodeScanner){
         updateStatus('Skener je već aktivan','active');
         return;
       }
@@ -107,110 +102,104 @@
         return;
       }
 
-      updateStatus('Pokretanje ML Kit skenera...','waiting');
+      updateStatus('Provera kamera...','waiting');
 
-      try{
-        var videoElement=document.createElement('video');
-        videoElement.style.width='100%';
-        videoElement.style.height='100%';
-        videoElement.style.objectFit='cover';
-        videoElement.style.borderRadius='12px';
-        videoElement.autoplay=true;
-        videoElement.playsInline=true;
-        
-        var reader=document.getElementById('reader');
-        reader.innerHTML='';
-        reader.appendChild(videoElement);
+      Html5Qrcode.getCameras()
+        .then(function(devices){
+          console.log('[Scanner] Cameras found:',devices);
+          if(!devices||!devices.length){
+            updateStatus('Nema pronađenih kamera','error');
+            return;
+          }
 
-        barcodeScanner=new BarcodeScanner({locateFile:function(file){
-          return 'https://cdn.jsdelivr.net/npm/@mediapipe/barcode_scanner/'+file;
-        }});
+          try{
+            html5QrcodeScanner=new Html5Qrcode("reader");
+            var config={
+              fps:10,
+              qrbox:{width:250,height:150},
+              aspectRatio:1.0,
+              supportedScanTypes:[Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+            };
 
-        barcodeScanner.setOptions({
-          modelAssetPath:'https://cdn.jsdelivr.net/npm/@mediapipe/barcode_scanner/barcode_scanner.tflite',
-          modelAssetPath:'https://cdn.jsdelivr.net/npm/@mediapipe/barcode_scanner/barcode_scanner_gpu.tflite'
+            var cameraConfig={facingMode:"environment"};
+            console.log('[Scanner] Using camera config:',cameraConfig);
+
+            html5QrcodeScanner.start(
+              cameraConfig,
+              config,
+              onScanSuccess,
+              onScanFailure
+            ).then(function(){
+              updateStatus('Aktivan - Skenirajte barkod','active');
+              console.log('[Scanner] Scanner started successfully');
+            }).catch(function(err){
+              console.error('[Scanner] Start error:',err);
+              updateStatus('Greška kamere: '+err,'error');
+              try{html5QrcodeScanner.clear();}catch(e){}
+              html5QrcodeScanner=null;
+            });
+          }catch(e){
+            console.error('[Scanner] Init error:',e);
+            updateStatus('Greška: '+e,'error');
+            try{html5QrcodeScanner.clear();}catch(err){}
+            html5QrcodeScanner=null;
+          }
+        })
+        .catch(function(err){
+          console.error('[Scanner] Get cameras error:',err);
+          updateStatus('Greška pri listanju kamera: '+err,'error');
         });
-
-        barcodeScanner.onResults(onBarcodeResults);
-
-        camera=new Camera(videoElement,{
-          onFrame:async function(){
-            await barcodeScanner.send({image:videoElement});
-          },
-          width:1920,
-          height:1080,
-          facingMode:'environment'
-        });
-
-        camera.start().then(function(){
-          updateStatus('Aktivan - Skenirajte barkod','active');
-          console.log('[Scanner] ML Kit scanner started successfully');
-        }).catch(function(err){
-          console.error('[Scanner] Camera start error:',err);
-          updateStatus('Greška kamere: '+err,'error');
-          barcodeScanner=null;
-          camera=null;
-        });
-      }catch(e){
-        console.error('[Scanner] Init error:',e);
-        updateStatus('Greška: '+e,'error');
-        barcodeScanner=null;
-        camera=null;
-      }
     }
 
     function stopScanner(){
       console.log('[Scanner] stopScanner called');
-      if(camera){
-        camera.stop();
-        camera=null;
+      if(html5QrcodeScanner){
+        html5QrcodeScanner.stop().then(function(){
+          html5QrcodeScanner.clear();
+          html5QrcodeScanner=null;
+          if(videoTrack){
+            videoTrack.stop();
+            videoTrack=null;
+          }
+          updateStatus('Zaustavljeno','');
+        }).catch(function(err){
+          try{html5QrcodeScanner.clear();}catch(e){}
+          html5QrcodeScanner=null;
+          if(videoTrack){
+            videoTrack.stop();
+            videoTrack=null;
+          }
+          updateStatus('Zaustavljeno','');
+        });
       }
-      if(barcodeScanner){
-        barcodeScanner.close();
-        barcodeScanner=null;
-      }
-      if(videoTrack){
-        videoTrack.stop();
-        videoTrack=null;
-      }
-      updateStatus('Zaustavljeno','');
     }
 
-    function onBarcodeResults(results){
-      if(results&&results.barcodes&&results.barcodes.length>0){
-        var barcode=results.barcodes[0].raw_value;
-        var now=Date.now();
-        
-        // Debounce: only process if different barcode or 2 seconds passed
-        if(barcode!==lastBarcode||(now-lastScanTime>2000)){
-          console.log('[Scanner] Barcode detected:',barcode);
-          consecutiveFailures=0;
-          lastBarcode=barcode;
-          lastScanTime=now;
-          
-          // Play beep
-          try{audioBeep.play().catch(function(){});}catch(e){}
-          
-          // Show last scan
-          showLastScan(barcode);
-          
-          // Send to parent window
-          if(window.opener){
-            console.log('[Scanner] Sending to parent window');
-            window.opener.postMessage({
-              type:'barcode',
-              data:barcode
-            },'*');
-          }else{
-            console.log('[Scanner] No parent window, barcode:',barcode);
-          }
-        }
+    function onScanSuccess(decodedText,decodedResult){
+      console.log('[Scanner] Scan success:',decodedText);
+      consecutiveFailures=0;
+      // Play beep
+      try{audioBeep.play().catch(function(){});}catch(e){}
+
+      // Show last scan
+      showLastScan(decodedText);
+
+      // Send to parent window
+      if(window.opener){
+        console.log('[Scanner] Sending to parent window');
+        window.opener.postMessage({
+          type:'barcode',
+          data:decodedText
+        },'*');
       }else{
-        consecutiveFailures++;
-        if(consecutiveFailures>=30){
-          updateStatus('Status: Nakrivite paket (odsjaj celofana)','waiting');
-          consecutiveFailures=0;
-        }
+        console.log('[Scanner] No parent window, barcode:',decodedText);
+      }
+    }
+
+    function onScanFailure(error){
+      consecutiveFailures++;
+      if(consecutiveFailures>=10){
+        updateStatus('Status: Nakrivite paket (odsjaj celofana)','waiting');
+        consecutiveFailures=0;
       }
     }
 
@@ -285,6 +274,12 @@
 
     function toggleFlashlight(){
       console.log('[Scanner] toggleFlashlight called');
+      if(!html5QrcodeScanner){
+        updateStatus('Prvo pokrenite kameru','error');
+        return;
+      }
+
+      // Try to get video track and toggle torch
       var videoElement=document.querySelector('#reader video');
       if(videoElement&&videoElement.srcObject){
         var tracks=videoElement.srcObject.getVideoTracks();
