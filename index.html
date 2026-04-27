@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Barcode Scanner</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/@zxing/browser@latest" type="text/javascript"></script>
+  <script src="https://unpkg.com/@zxing/library@latest" type="text/javascript"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d0d0d;color:#e8e8e8;min-height:100vh;display:flex;flex-direction:column;}
@@ -144,28 +146,58 @@
         var preview=document.getElementById('preview-image');
         var previewContainer=document.getElementById('preview-container');
         
-        // Show preview
+        // Show preview and scan
         var reader=new FileReader();
         reader.onload=function(event){
           var imgData=event.target.result;
           preview.src=imgData;
           previewContainer.style.display='block';
+          
+          // Wait for image to load before scanning
+          preview.onload=function(){
+            console.log('[Scanner] Image loaded, starting scan');
+            
+            // Use ZXing for more reliable static image scanning
+            try{
+              var codeReader=new ZXing.BrowserMultiFormatReader();
+              codeReader.decodeFromImageElement(preview)
+                .then(function(result){
+                  console.log('[Scanner] ZXing scan success:',result.text);
+                  handleScanSuccess(result.text,previewContainer,preview);
+                  codeReader.reset();
+                })
+                .catch(function(err){
+                  console.error('[Scanner] ZXing scan error:',err);
+                  // Fallback to html5-qrcode
+                  var html5QrCode=new Html5Qrcode("reader");
+                  var hints = { formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] };
+                  html5QrCode.scanFile(file, true)
+                    .then(function(decodedText){
+                      console.log('[Scanner] html5-qrcode fallback success:',decodedText);
+                      handleScanSuccess(decodedText,previewContainer,preview);
+                    })
+                    .catch(function(err2){
+                      console.error('[Scanner] html5-qrcode fallback error:',err2);
+                      handleScanError(err2,previewContainer,preview);
+                    });
+                });
+            }catch(e){
+              console.error('[Scanner] ZXing not available, using html5-qrcode:',e);
+              var html5QrCode=new Html5Qrcode("reader");
+              var hints = { formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] };
+              html5QrCode.scanFile(file, true)
+                .then(function(decodedText){
+                  console.log('[Scanner] html5-qrcode success:',decodedText);
+                  handleScanSuccess(decodedText,previewContainer,preview);
+                })
+                .catch(function(err){
+                  console.error('[Scanner] html5-qrcode error:',err);
+                  handleScanError(err,previewContainer,preview);
+                });
+            }
+          };
         };
         reader.readAsDataURL(file);
-        
-        // Scan the image using html5-qrcode library
-        console.log('[Scanner] Starting scan with file:',file.name,'size:',file.size,'type:',file.type);
-        var html5QrCode=new Html5Qrcode("reader");
-        var config = { formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] };
-        html5QrCode.scanFile(file, true, config)
-          .then(function(decodedText){
-            console.log('[Scanner] scanFile resolved with:',decodedText);
-            handleScanSuccess(decodedText,previewContainer,preview);
-          })
-          .catch(function(err){
-            console.error('[Scanner] Scan error:',err);
-            handleScanError(err,previewContainer,preview);
-          });
       }
     });
 
